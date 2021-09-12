@@ -2,8 +2,9 @@ module HandleKey(mainHandleKey) where
   
 import Prelude
 
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..),fromMaybe)
 import Data.String as String
+import Data.Array
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
@@ -23,7 +24,7 @@ mainHandleKey = HA.runHalogenAff do
     body <- HA.awaitBody
     runUI component unit body
 
-type State = {chars :: String}
+type State = {chars :: String,strarr :: Array String}
 
 data Action 
     = Initialize 
@@ -43,16 +44,19 @@ component =
         }
 
 initialState :: forall input . input -> State
-initialState _ = {chars: ""}
+initialState _ = {chars: "",strarr: []}
 
 render :: forall m . State -> H.ComponentHTML Action () m
 render state = 
+    let arr = state.strarr 
+        f xs = HH.p_ [HH.text xs]
+    in
     HH.div_
-        [
+        ([
             HH.p_ [HH.text "Hold down the shift key and type some characters!"]
         ,   HH.p_ [HH.text "Press ENTER or RETURN to clear and remove the event listener."]
-        ,   HH.p_ [HH.text state.chars]
-        ]
+        ] <> map f arr)
+        
 
 
 handleAction :: forall output m. MonadAff m => Action -> H.HalogenM State Action () output m Unit
@@ -61,20 +65,20 @@ handleAction = case _ of
         document <- H.liftEffect $ document =<< window
         H.subscribe' \sid ->
             eventListener
-                KET.keyup
+                KET.keydown
                     (HTMLDocument.toEventTarget document)
                     (map (HandleKey sid) <<< KE.fromEvent)
     
     HandleKey sid ev
-        | KE.shiftKey ev -> do
+        | true -> do
             H.liftEffect $ E.preventDefault $ KE.toEvent ev
             let char = KE.key ev
-            when (String.length char == 1) do
-                H.modify_ \st -> st {chars = st.chars <> char}
+            when (let x = String.length char in foldr (||) false $ zipWith (==) (replicate 10 x) [0,1,2,3,4,5]  ) do
+                H.modify_ \st -> if char == "Enter" then st{chars = st.chars <> "\n",strarr = st.strarr <> [st.chars]} else if char == "Tab" then st {chars = st.chars <> "    "} else st{chars = st.chars <> char}
         
         | KE.key ev == "Enter" -> do
             H.liftEffect $ E.preventDefault (KE.toEvent ev)
-            H.modify_ _ {chars = ""}
-            H.unsubscribe sid
+            let char = KE.key ev
+            H.modify_ \st -> st{chars =  st.chars <> char}
         
         | otherwise -> pure unit
