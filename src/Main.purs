@@ -20,9 +20,10 @@ import Web.UIEvent.KeyboardEvent.EventTypes as KET
 
 import Timer
 import HandleKey
+import Parent
 
 main :: Effect Unit
-main = mainHandleKey
+main = mainParent
 -- main = HA.runHalogenAff do
 --   body <- HA.awaitBody
 --   runUI component unit body
